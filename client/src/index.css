@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --ring: #e2ae22;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans Thai", Prompt, sans-serif;
+  background: #eef3f8;
+  color: #10203a;
+}
+
+.dark body {
+  background: #070d18;
+  color: #e8eef8;
+}
+
+.bg-app {
+  background-color: #eef3f8;
+  background-image:
+    radial-gradient(1100px 480px at 100% -10%, rgba(226, 174, 34, 0.18), transparent 55%),
+    radial-gradient(800px 420px at -10% 0%, rgba(18, 58, 140, 0.1), transparent 50%);
+}
+
+.dark .bg-app {
+  background-color: #070d18;
+  background-image:
+    radial-gradient(900px 420px at 100% -10%, rgba(226, 174, 34, 0.14), transparent 50%),
+    radial-gradient(800px 480px at -20% 10%, rgba(29, 78, 216, 0.22), transparent 55%);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 20px 50px -32px rgba(7, 24, 51, 0.55);
+  backdrop-filter: blur(16px);
+}
+
+.dark .glass {
+  background: rgba(10, 18, 34, 0.72);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 50px -32px rgba(0, 0, 0, 0.7);
+}
+
+.court-lines {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+::selection {
+  background: #f5c542;
+  color: #071833;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c5d0e2;
+  border-radius: 99px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #24344f;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rise {
+  animation: rise 0.45s ease both;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.7); opacity: 0.55; }
+}
+
+.live-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes dash {
+  to { stroke-dashoffset: -240; }
+}
+
+.dash {
+  stroke-dasharray: 8 10;
+  animation: dash 12s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body, .bg-app { background: white !important; }
+  .print-area { box-shadow: none !important; border: none !important; }
+}
+
+.pb-nav {
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .pb-nav { padding-bottom: 2.5rem; }
+}

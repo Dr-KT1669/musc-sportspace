@@ -1,0 +1,23 @@
+services:
+  sportspace:
+    build: .
+    ports:
+      - "43123:43123"
+    environment:
+      NODE_ENV: production
+      PORT: 43123
+      DATABASE_URL: file:/data/sportspace.db
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-sportspace}
+      MAIL_FROM: ${MAIL_FROM:-MUSC SportSpace <no-reply@sportspace.sc.mahidol.ac.th>}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-0}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
+    volumes:
+      - sportspace-data:/data
+    restart: unless-stopped
+
+volumes:
+  sportspace-data:
