@@ -27,7 +27,6 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
-        sync: false
       - key: NODE_ENV
         value: production
       - key: HOLD_SECONDS
