@@ -1,13 +1,36 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sportspace
+      POSTGRES_PASSWORD: sportspace
+      POSTGRES_DB: sportspace
+    ports:
+      - "5432:5432"
+    volumes:
+      - sportspace-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sportspace -d sportspace"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   sportspace:
     build: .
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "43123:43123"
     environment:
       NODE_ENV: production
       PORT: 43123
-      DATABASE_URL: file:/data/sportspace.db
+      DATABASE_URL: postgresql://sportspace:sportspace@db:5432/sportspace
+      DATABASE_POOL_SIZE: 10
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-sportspace}
+      HOLD_SECONDS: ${HOLD_SECONDS:-90}
+      BOOKING_USER_LIMIT: ${BOOKING_USER_LIMIT:-6}
+      BOOKING_IP_LIMIT: ${BOOKING_IP_LIMIT:-2000}
       MAIL_FROM: ${MAIL_FROM:-MUSC SportSpace <no-reply@sportspace.sc.mahidol.ac.th>}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -15,9 +38,13 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-0}
-    volumes:
-      - sportspace-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:43123/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 40s
     restart: unless-stopped
 
 volumes:
-  sportspace-data:
+  sportspace-pg:

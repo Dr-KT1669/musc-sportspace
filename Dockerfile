@@ -9,6 +9,6 @@ COPY tsconfig.json ./
 RUN npm install && npm run build
 ENV NODE_ENV=production
 ENV PORT=43123
-ENV DATABASE_URL=file:/data/sportspace.db
 EXPOSE 43123
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||43123)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["sh", "-c", "npx prisma db push && npx tsx prisma/seed.ts && npx tsx server/src/index.ts"]

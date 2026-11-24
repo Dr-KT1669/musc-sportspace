@@ -1,5 +1,4 @@
-import bcrypt from 'bcryptjs'
-import { randomBytes, randomInt } from 'node:crypto'
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { getPrisma } from './db.js'
 import { broadcast } from './events.js'
@@ -12,9 +11,10 @@ import {
   checkInLateMinutes,
   isMahidolEmail,
   minLeadMinutes,
+  holdMs,
+  holdSeconds,
   otpMaxAttempts,
   otpMaxSends,
-  otpTtlMinutes,
   bookingWindowDays,
 } from './rules.js'
 import { addDays, bangkokNowParts, expandRange, formatMinutes, generateSlots, isValidDate, minutesUntil, parseMinutes } from './time.js'
@@ -36,20 +36,62 @@ function isUniqueError(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
 }
 
-function isBusy(error: unknown) {
+function isRetryable(error: unknown) {
   const message = String(error)
-  return /SQLITE_BUSY|database is locked/.test(message)
+  if (/deadlock detected|40P01|could not serialize|40001/.test(message)) return true
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
+}
+
+function hashOtp(code: string, salt: string) {
+  const secret = process.env.JWT_SECRET || 'dev-only-change-me-sportspace'
+  return createHmac('sha256', secret).update(`${salt}:${code}`).digest('hex')
+}
+
+function otpMatches(code: string, salt: string, hash: string) {
+  const next = hashOtp(code, salt)
+  const left = Buffer.from(hash)
+  const right = Buffer.from(next)
+  return left.length === right.length && timingSafeEqual(left, right)
+}
+
+type Tx = Prisma.TransactionClient
+
+async function releaseInTx(tx: Tx, id: string, status: 'EXPIRED' | 'CANCELLED', refundReason: string) {
+  const current = await tx.booking.findUnique({ where: { id }, include: { loans: true } })
+  if (!current || !['PENDING_OTP', 'CONFIRMED'].includes(current.status)) return null
+  await tx.booking.update({
+    where: { id },
+    data: { status, cancelledAt: status === 'CANCELLED' ? new Date() : current.cancelledAt },
+  })
+  await tx.slotLock.deleteMany({ where: { bookingId: id } })
+  await tx.otpCode.updateMany({ where: { bookingId: id }, data: { consumed: true } })
+  for (const loan of current.loans) {
+    await tx.equipment.update({
+      where: { id: loan.equipmentId },
+      data: { availableQty: { increment: loan.qty } },
+    })
+  }
+  if (current.lightCost > 0) {
+    await tx.user.update({
+      where: { id: current.userId },
+      data: { coinBalance: { increment: current.lightCost } },
+    })
+    await tx.walletTransaction.create({
+      data: { userId: current.userId, amount: current.lightCost, reason: refundReason, bookingId: id },
+    })
+  }
+  return current
 }
 
 async function withBusyRetry<T>(fn: () => Promise<T>) {
   let last: unknown
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     try {
       return await fn()
     } catch (error) {
       last = error
-      if (!isBusy(error) || i === 2) throw error
-      await new Promise((resolve) => setTimeout(resolve, 40 * (i + 1)))
+      if (!isRetryable(error) || i === 3) throw error
+      await new Promise((resolve) => setTimeout(resolve, 15 * (i + 1)))
     }
   }
   throw last
@@ -79,33 +121,7 @@ export async function sweep() {
 }
 
 async function releaseBooking(id: string, status: 'EXPIRED' | 'CANCELLED', refundReason: string) {
-  const prisma = getPrisma()
-  const updated = await prisma.$transaction(async (tx) => {
-    const current = await tx.booking.findUnique({ where: { id }, include: { loans: true } })
-    if (!current || !['PENDING_OTP', 'CONFIRMED'].includes(current.status)) return null
-    await tx.booking.update({
-      where: { id },
-      data: { status, cancelledAt: status === 'CANCELLED' ? new Date() : current.cancelledAt },
-    })
-    await tx.slotLock.deleteMany({ where: { bookingId: id } })
-    await tx.otpCode.updateMany({ where: { bookingId: id }, data: { consumed: true } })
-    for (const loan of current.loans) {
-      await tx.equipment.update({
-        where: { id: loan.equipmentId },
-        data: { availableQty: { increment: loan.qty } },
-      })
-    }
-    if (current.lightCost > 0) {
-      await tx.user.update({
-        where: { id: current.userId },
-        data: { coinBalance: { increment: current.lightCost } },
-      })
-      await tx.walletTransaction.create({
-        data: { userId: current.userId, amount: current.lightCost, reason: refundReason, bookingId: id },
-      })
-    }
-    return current
-  })
+  const updated = await getPrisma().$transaction((tx) => releaseInTx(tx, id, status, refundReason))
   if (updated) broadcast({ type: 'availability', facilityId: updated.facilityId, date: updated.date })
   return updated
 }
@@ -115,7 +131,6 @@ function closureCovers(closures: { startDate: string; endDate: string; reason: s
 }
 
 export async function getAvailability(facilityId: string, date: string, userId?: string) {
-  await sweep()
   const prisma = getPrisma()
   const facility = await prisma.facility.findUnique({
     where: { id: facilityId },
@@ -125,17 +140,21 @@ export async function getAvailability(facilityId: string, date: string, userId?:
   const closure = closureCovers(facility.closures, date)
   const locks = await prisma.slotLock.findMany({
     where: { facilityId, date },
-    include: { booking: { select: { id: true, userId: true, status: true } } },
+    include: { booking: { select: { id: true, userId: true, status: true, otp: { select: { expiresAt: true } } } } },
   })
   const lockByStart = new Map(locks.map((lock) => [lock.startTime, lock]))
   const nowParts = bangkokNowParts()
   const slots = generateSlots(facility.openTime, facility.closeTime, facility.slotMinutes).map((slot) => {
     const lock = lockByStart.get(slot.startTime)
     const until = minutesUntil(date, slot.startTime)
+    const holdExpired =
+      lock?.booking.status === 'PENDING_OTP' &&
+      !!lock.booking.otp &&
+      lock.booking.otp.expiresAt.getTime() <= Date.now()
     let state: 'available' | 'booked' | 'holding' | 'mine' | 'past' | 'closed' = 'available'
     if (closure) state = 'closed'
     else if (date < nowParts.date || (date === nowParts.date && until < minLeadMinutes())) state = 'past'
-    else if (lock) {
+    else if (lock && !holdExpired) {
       if (lock.booking.userId === userId && lock.booking.status !== 'PENDING_OTP') state = 'mine'
       else if (lock.booking.status === 'PENDING_OTP') state = 'holding'
       else state = 'booked'
@@ -211,10 +230,11 @@ export async function createBooking(
     notes?: string
     teammates?: TeammateInput[]
     equipment?: EquipmentInput[]
+    idempotencyKey?: string
   },
 ) {
-  await sweep()
   const prisma = getPrisma()
+  const idempotencyKey = input.idempotencyKey?.trim() || undefined
   if (!isValidDate(input.date)) throw new ApiError(400, 'VALIDATION', 'วันที่ไม่ถูกต้อง')
   const today = bangkokNowParts().date
   const last = addDays(today, bookingWindowDays())
@@ -261,6 +281,23 @@ export async function createBooking(
     throw new ApiError(400, 'NO_LIGHTS', 'สนามนี้ไม่มีตัวเลือกเปิดไฟ')
   }
   const lightCost = lightsOn ? facility.lightCoinCost * hours : 0
+  const limit = MAX_ACTIVE[user.role] ?? 3
+
+  if (idempotencyKey) {
+    const replay = await prisma.booking.findFirst({ where: { userId: user.id, idempotencyKey } })
+    if (replay) return finishBooking(user, replay.id, true)
+  }
+  const sameSlot = await prisma.booking.findFirst({
+    where: {
+      userId: user.id,
+      facilityId: facility.id,
+      date: input.date,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      status: { in: ['PENDING_OTP', 'CONFIRMED', 'CHECKED_IN'] },
+    },
+  })
+  if (sameSlot) return finishBooking(user, sameSlot.id, true)
 
   const active = await prisma.booking.count({
     where: {
@@ -269,20 +306,49 @@ export async function createBooking(
       date: { gte: today },
     },
   })
-  const limit = MAX_ACTIVE[user.role] ?? 3
   if (active >= limit) {
     throw new ApiError(409, 'MAX_ACTIVE', `จองพร้อมกันได้ไม่เกิน ${limit} รายการ กรุณายกเลิกหรือใช้งานรายการเดิมก่อน`)
   }
 
   const teammates = await resolveTeammates(user, input.teammates || [])
   const code = makeOtp()
-  const codeHash = await bcrypt.hash(code, 8)
-  const expiresAt = new Date(Date.now() + otpTtlMinutes() * 60 * 1000)
+  const salt = randomBytes(16).toString('hex')
+  const codeHash = hashOtp(code, salt)
+  const expiresAt = new Date(Date.now() + holdMs())
 
   let createdId = ''
   try {
     createdId = await withBusyRetry(() =>
       prisma.$transaction(async (tx) => {
+        const stale = await tx.otpCode.findMany({
+          where: {
+            consumed: false,
+            expiresAt: { lt: new Date() },
+            booking: { status: 'PENDING_OTP', facilityId: facility.id, date: input.date },
+          },
+          select: { bookingId: true },
+        })
+        for (const row of stale) {
+          await releaseInTx(tx, row.bookingId, 'EXPIRED', 'คืนเหรียญเปิดไฟ (OTP หมดอายุ)')
+        }
+
+        const holds = await tx.booking.count({ where: { userId: user.id, status: 'PENDING_OTP' } })
+        if (holds > 0) {
+          throw new TxAbort(
+            new ApiError(409, 'HOLD_EXISTS', `คุณมีช่วงเวลาที่กำลังยืนยันอยู่ ยืนยันภายใน ${holdSeconds()} วินาที หรือรอให้หมดเวลาก่อนจองช่วงใหม่`),
+          )
+        }
+        const activeNow = await tx.booking.count({
+          where: {
+            userId: user.id,
+            status: { in: ['PENDING_OTP', 'CONFIRMED', 'CHECKED_IN'] },
+            date: { gte: today },
+          },
+        })
+        if (activeNow >= limit) {
+          throw new TxAbort(new ApiError(409, 'MAX_ACTIVE', `จองพร้อมกันได้ไม่เกิน ${limit} รายการ`))
+        }
+
         const booking = await tx.booking.create({
           data: {
             userId: user.id,
@@ -296,10 +362,18 @@ export async function createBooking(
             lightCost,
             notes: input.notes?.trim() || '',
             status: 'PENDING_OTP',
+            idempotencyKey,
             checkInCode: makeCheckInCode(),
             qrToken: randomBytes(16).toString('hex'),
           },
         })
+
+        // The unique slot row is the finish line: the first insert wins, everyone else rolls back.
+        for (const startTime of slotStarts) {
+          await tx.slotLock.create({
+            data: { facilityId: facility.id, date: input.date, startTime, bookingId: booking.id },
+          })
+        }
 
         if (lightCost > 0) {
           const charged = await tx.user.updateMany({
@@ -316,12 +390,6 @@ export async function createBooking(
               reason: `เปิดไฟ ${facility.nameTh}`,
               bookingId: booking.id,
             },
-          })
-        }
-
-        for (const startTime of slotStarts) {
-          await tx.slotLock.create({
-            data: { facilityId: facility.id, date: input.date, startTime, bookingId: booking.id },
           })
         }
 
@@ -344,15 +412,31 @@ export async function createBooking(
           })
         }
         await tx.otpCode.create({
-          data: { bookingId: booking.id, codeHash, expiresAt, attempts: 0, sends: 1 },
+          data: { bookingId: booking.id, codeHash, salt, expiresAt, attempts: 0, sends: 1 },
         })
         return booking.id
-      }),
+      }, { timeout: 8000, maxWait: 10000 }),
     )
   } catch (error) {
     if (error instanceof TxAbort) throw error.api
     if (isUniqueError(error)) {
-      throw new ApiError(409, 'SLOT_TAKEN', 'ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกช่วงอื่น')
+      const target = String((error as Prisma.PrismaClientKnownRequestError).meta?.target || '')
+      if (idempotencyKey && target.toLowerCase().includes('idempotency')) {
+        const existing = await prisma.booking.findFirst({ where: { userId: user.id, idempotencyKey } })
+        if (existing) return finishBooking(user, existing.id, true)
+      }
+      const own = await prisma.booking.findFirst({
+        where: {
+          userId: user.id,
+          facilityId: facility.id,
+          date: input.date,
+          startTime: input.startTime,
+          endTime: input.endTime,
+          status: { in: ['PENDING_OTP', 'CONFIRMED'] },
+        },
+      })
+      if (own) return finishBooking(user, own.id, true)
+      throw new ApiError(409, 'SLOT_TAKEN', 'มีคนจองช่วงนี้ไปก่อนคุณแล้ว กรุณาเลือกช่วงอื่น')
     }
     throw error
   }
@@ -364,6 +448,7 @@ export async function createBooking(
     facility: facility.nameTh,
     when,
     bookingId: createdId,
+    holdSeconds: holdSeconds(),
   })
   try {
     await sendMail({ to: user.email, ...mail })
@@ -374,12 +459,19 @@ export async function createBooking(
     }
   }
 
-  broadcast({ type: 'availability', facilityId: facility.id, date: input.date })
+  return finishBooking(user, createdId, false)
+}
+
+async function finishBooking(user: PublicUser, bookingId: string, replayed: boolean) {
+  const prisma = getPrisma()
+  const booking = await loadBooking(bookingId)
+  if (!booking) throw new ApiError(404, 'NOT_FOUND', 'ไม่พบการจอง')
+  if (!replayed) broadcast({ type: 'availability', facilityId: booking.facilityId, date: booking.date })
   const freshUser = await prisma.user.findUnique({ where: { id: user.id } })
-  const booking = await loadBooking(createdId)
   return {
-    booking: serializeBooking(booking!, { revealSecrets: false }),
-    otpExpiresAt: expiresAt.toISOString(),
+    replayed,
+    booking: serializeBooking(booking, { revealSecrets: booking.status !== 'PENDING_OTP' }),
+    otpExpiresAt: booking.otp?.expiresAt?.toISOString?.() ?? booking.otp?.expiresAt ?? null,
     coinBalance: freshUser?.coinBalance ?? user.coinBalance,
   }
 }
@@ -434,7 +526,7 @@ export async function verifyOtp(user: PublicUser, bookingId: string, code: strin
     await releaseBooking(booking.id, 'EXPIRED', 'คืนเหรียญเปิดไฟ (OTP หมดอายุ)')
     throw new ApiError(400, 'OTP_EXPIRED', 'รหัส OTP หมดอายุแล้ว ช่วงเวลาถูกปล่อยให้ผู้อื่นจอง')
   }
-  const ok = await bcrypt.compare(code, booking.otp.codeHash)
+  const ok = otpMatches(code, booking.otp.salt, booking.otp.codeHash)
   if (!ok) {
     const attempts = booking.otp.attempts + 1
     if (attempts >= otpMaxAttempts()) {
@@ -474,12 +566,16 @@ export async function resendOtp(user: PublicUser, bookingId: string) {
   if (booking.otp.sends >= otpMaxSends()) {
     throw new ApiError(429, 'OTP_RESEND_LIMIT', 'ส่งรหัสซ้ำได้ไม่เกิน 3 ครั้งต่อการจอง')
   }
+  if (booking.otp.expiresAt.getTime() < Date.now()) {
+    await releaseBooking(booking.id, 'EXPIRED', 'คืนเหรียญเปิดไฟ (OTP หมดอายุ)')
+    throw new ApiError(400, 'OTP_EXPIRED', 'รหัส OTP หมดอายุแล้ว ช่วงเวลาถูกปล่อยให้ผู้อื่นจอง')
+  }
   const code = makeOtp()
-  const codeHash = await bcrypt.hash(code, 8)
-  const expiresAt = new Date(Date.now() + otpTtlMinutes() * 60 * 1000)
+  const salt = randomBytes(16).toString('hex')
+  const codeHash = hashOtp(code, salt)
   await prisma.otpCode.update({
     where: { id: booking.otp.id },
-    data: { codeHash, expiresAt, attempts: 0, consumed: false, sends: { increment: 1 } },
+    data: { codeHash, salt, attempts: 0, consumed: false, sends: { increment: 1 } },
   })
   const mail = otpEmail({
     name: user.name,
@@ -487,9 +583,10 @@ export async function resendOtp(user: PublicUser, bookingId: string) {
     facility: booking.facility.nameTh,
     when: `${booking.date} ${booking.startTime}–${booking.endTime}`,
     bookingId: booking.id,
+    holdSeconds: Math.max(1, Math.round((booking.otp.expiresAt.getTime() - Date.now()) / 1000)),
   })
   await sendMail({ to: user.email, ...mail })
-  return { otpExpiresAt: expiresAt.toISOString() }
+  return { otpExpiresAt: booking.otp.expiresAt.toISOString() }
 }
 
 export async function cancelBooking(user: PublicUser, bookingId: string) {

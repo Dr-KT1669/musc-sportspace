@@ -21,8 +21,19 @@ export function minLeadMinutes() {
 export function cancelLeadMinutes() {
   return Number(process.env.CANCEL_LEAD_MINUTES || 120)
 }
+/** How long a won slot stays locked while the winner types the OTP. */
+export function holdMs() {
+  if (process.env.HOLD_SECONDS) return Number(process.env.HOLD_SECONDS) * 1000
+  if (process.env.OTP_TTL_MINUTES) return Number(process.env.OTP_TTL_MINUTES) * 60 * 1000
+  return 90_000
+}
+
+export function holdSeconds() {
+  return Math.round(holdMs() / 1000)
+}
+
 export function otpTtlMinutes() {
-  return Number(process.env.OTP_TTL_MINUTES || 5)
+  return holdMs() / 60_000
 }
 export function otpMaxAttempts() {
   return Number(process.env.OTP_MAX_ATTEMPTS || 5)
@@ -58,6 +69,7 @@ export function rulesPayload(devMail: boolean) {
     minLeadMinutes: minLeadMinutes(),
     cancelLeadMinutes: cancelLeadMinutes(),
     otpTtlMinutes: otpTtlMinutes(),
+    holdSeconds: holdSeconds(),
     otpMaxAttempts: otpMaxAttempts(),
     otpMaxSends: otpMaxSends(),
     checkInEarlyMinutes: checkInEarlyMinutes(),

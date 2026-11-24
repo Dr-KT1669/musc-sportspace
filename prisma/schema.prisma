@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -79,6 +79,7 @@ model Booking {
   lightCost    Int               @default(0)
   notes        String            @default("")
   status       String
+  idempotencyKey String?
   checkInCode  String            @unique
   qrToken      String            @unique
   checkedInAt  DateTime?
@@ -92,6 +93,7 @@ model Booking {
   locks        SlotLock[]
   otp          OtpCode?
 
+  @@unique([userId, idempotencyKey])
   @@index([userId, date])
   @@index([date, status])
   @@index([facilityId, date])
@@ -133,6 +135,7 @@ model OtpCode {
   id        String   @id @default(cuid())
   bookingId String   @unique
   codeHash  String
+  salt      String
   expiresAt DateTime
   attempts  Int      @default(0)
   sends     Int      @default(1)

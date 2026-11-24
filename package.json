@@ -12,6 +12,7 @@
     "db:setup": "prisma db push && tsx prisma/seed.ts",
     "seed": "tsx prisma/seed.ts",
     "test": "prisma generate && vitest run",
+    "rush": "tsx scripts/rush.ts",
     "build": "vite build --config client/vite.config.ts",
     "start": "tsx --env-file=.env server/src/index.ts",
     "postinstall": "prisma generate"

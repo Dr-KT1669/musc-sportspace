@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Check, Lightbulb, LightbulbOff, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { SportArt, sportOf } from '../components/Sports'
 import { Button, Field, Skeleton } from '../components/ui'
@@ -40,6 +40,11 @@ export default function BookPage() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [left, setLeft] = useState('')
+  const [lost, setLost] = useState('')
+  const idempotencyKey = useRef('')
+  const submitting = useRef(false)
+  const startRef = useRef('')
+  const stepRef = useRef(step)
 
   useEffect(() => {
     api<{ facility: Facility }>(`/api/facilities/${slug}`)
@@ -68,9 +73,37 @@ export default function BookPage() {
     load()
     const timer = window.setInterval(load, 4000)
     const stream = new EventSource('/api/events')
-    stream.onmessage = () => load()
+    stream.onmessage = () => {
+      load().then(() => {
+        const chosen = startRef.current
+        if (!chosen || stepRef.current !== 'time') return
+      })
+    }
     return () => { stop = true; clearInterval(timer); stream.close() }
   }, [slug, date, toast])
+
+  useEffect(() => {
+    startRef.current = start
+    stepRef.current = step
+    idempotencyKey.current = crypto.randomUUID()
+    setLost('')
+  }, [slug, date, start, hours, step])
+
+  const warnedSlot = useRef('')
+  useEffect(() => {
+    if (!start || (step !== 'time' && step !== 'details')) return
+    const slot = slots.find((item) => item.startTime === start)
+    if (!slot) return
+    const gone = slot.state === 'booked' || slot.state === 'closed' || (slot.state === 'holding' && !slot.bookingId)
+    if (!gone) return
+    const key = `${date}:${start}`
+    if (warnedSlot.current === key) return
+    warnedSlot.current = key
+    setLost('ช่วงนี้ถูกจองไปก่อนคุณแล้ว')
+    setStart('')
+    setStep('time')
+    toast.push('ช่วงนี้ถูกจองไปก่อนคุณแล้ว เลือกช่วงใหม่ได้เลย', 'err')
+  }, [slots, start, step, date, toast])
 
   useEffect(() => {
     if (!expires || step !== 'otp') return
@@ -123,11 +156,14 @@ export default function BookPage() {
 
   async function submitBooking() {
     if (!user) { navigate('/login'); return }
+    if (submitting.current) return
+    submitting.current = true
     setBusy(true)
     try {
       const chosen = equipment.filter((item) => (qty[item.id] || 0) > 0).map((item) => ({ equipmentId: item.id, qty: qty[item.id] }))
-      const data = await api<{ booking: Booking; otpExpiresAt: string; coinBalance: number }>('/api/bookings', {
+      const data = await api<{ booking: Booking; otpExpiresAt: string; coinBalance: number; replayed?: boolean }>('/api/bookings', {
         method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey.current || crypto.randomUUID() },
         body: JSON.stringify({
           facilitySlug: slug,
           date,
@@ -145,10 +181,20 @@ export default function BookPage() {
       setExpires(data.otpExpiresAt)
       setCoins(data.coinBalance)
       setStep('otp')
-      toast.push('ส่งรหัส OTP ไปที่อีเมลสถาบันแล้ว', 'ok')
+      setLost('')
+      toast.push(data.replayed ? 'ใช้คำขอเดิมที่ส่งไปแล้ว' : 'ส่งรหัส OTP ไปที่อีเมลสถาบันแล้ว', 'ok')
     } catch (error) {
-      toast.push(error instanceof ApiError ? error.message : 'จองไม่สำเร็จ', 'err')
+      const message = error instanceof ApiError ? error.message : 'จองไม่สำเร็จ'
+      if (error instanceof ApiError && (error.code === 'SLOT_TAKEN' || error.code === 'HOLD_EXISTS')) {
+        setLost(message)
+        if (error.code === 'SLOT_TAKEN') {
+          setStart('')
+          setStep('time')
+        }
+      }
+      toast.push(message, 'err')
     } finally {
+      submitting.current = false
       setBusy(false)
     }
   }
@@ -199,6 +245,7 @@ export default function BookPage() {
               ))}
             </div>
             {closedReason && <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-sm text-amber-800">สนามปิด: {closedReason}</p>}
+            {lost && <p className="mt-3 rounded-2xl bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">{lost}</p>}
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
               {slots.map((slot) => {
                 const selected = start === slot.startTime
@@ -292,7 +339,8 @@ export default function BookPage() {
             <p className="mt-2 text-sm">เหลือเวลา {left || '...'}</p>
             <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" aria-label="รหัส OTP" className="mt-4 w-full rounded-3xl border px-4 py-4 text-center font-display text-3xl tracking-[0.4em] dark:border-white/10 dark:bg-transparent" />
             <Button className="mt-4 w-full" variant="gold" disabled={busy || code.length !== 6} onClick={confirmOtp}>ยืนยันการจอง</Button>
-            <p className="mt-3 text-sm text-slate-500">ทดลองโดยไม่ใช้อีเมลจริง? เปิด <Link className="underline" to="/dev-mail">กล่องจดหมายทดลอง</Link></p>
+            <p className="mt-3 text-sm text-slate-500">ถ้าไม่ยืนยันก่อนหมดเวลา ช่วงนี้จะกลับไปให้คนที่รออยู่</p>
+            <p className="mt-1 text-sm text-slate-500">ทดลองโดยไม่ใช้อีเมลจริง? เปิด <Link className="underline" to="/dev-mail">กล่องจดหมายทดลอง</Link></p>
           </div>
         )}
 

@@ -58,14 +58,15 @@ export async function sendMail(message: MailMessage) {
   })
 }
 
-export function otpEmail(opts: { name: string; code: string; facility: string; when: string; bookingId: string }) {
+export function otpEmail(opts: { name: string; code: string; facility: string; when: string; bookingId: string; holdSeconds?: number }) {
+  const seconds = opts.holdSeconds ?? 90
   const text = [
     `สวัสดี ${opts.name}`,
     '',
     `รหัสยืนยันการจองสนาม MUSC SportSpace คือ ${opts.code}`,
     `สนาม: ${opts.facility}`,
     `เวลา: ${opts.when}`,
-    'รหัสมีอายุ 5 นาที และใช้ได้ครั้งเดียว',
+    `รหัสมีอายุ ${seconds} วินาที และใช้ได้ครั้งเดียว ถ้าไม่ยืนยัน ช่วงเวลานี้จะกลับไปให้คนถัดไป`,
     '',
     'หากคุณไม่ได้ทำรายการนี้ ไม่ต้องดำเนินการใด ๆ',
   ].join('\n')
@@ -75,7 +76,7 @@ export function otpEmail(opts: { name: string; code: string; facility: string; w
       <p>รหัสยืนยันการจอง <strong>MUSC SportSpace</strong></p>
       <p style="font-size:32px;letter-spacing:8px;font-weight:700">${opts.code}</p>
       <p>สนาม: ${escapeHtml(opts.facility)}<br/>เวลา: ${escapeHtml(opts.when)}</p>
-      <p>รหัสมีอายุ 5 นาที</p>
+      <p>รหัสมีอายุ ${seconds} วินาที ถ้าไม่ยืนยัน ช่วงเวลาจะถูกปล่อย</p>
     </div>`
   return {
     subject: `รหัส OTP ${opts.code} ยืนยันการจอง SportSpace`,

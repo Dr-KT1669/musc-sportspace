@@ -27,7 +27,7 @@ import {
   withQr,
 } from './booking.js'
 import { getPrisma } from './db.js'
-import { addClient } from './events.js'
+import { addClient, clientCount } from './events.js'
 import { ApiError, asyncRoute, parseBody, toPublic } from './http.js'
 import { isDevMailer, listMailbox } from './mailer.js'
 import {
@@ -51,6 +51,21 @@ function limiter(max: number, windowMs: number) {
 const loginLimiter = limiter(10, 15 * 60 * 1000)
 const otpLimiter = limiter(30, 15 * 60 * 1000)
 const registerLimiter = limiter(8, 60 * 60 * 1000)
+const bookingIpLimiter = limiter(Number(process.env.BOOKING_IP_LIMIT || 2000), 60 * 1000)
+
+const userBookingHits = new Map<string, { at: number; key: string }[]>()
+function assertUserBookingRate(userId: string, idempotencyKey?: string) {
+  if (process.env.RATE_LIMIT_DISABLED === '1') return
+  const now = Date.now()
+  const max = Number(process.env.BOOKING_USER_LIMIT || 6)
+  const key = idempotencyKey || `anon-${now}-${Math.random()}`
+  const recent = (userBookingHits.get(userId) || []).filter((hit) => now - hit.at < 60_000)
+  if (!recent.some((hit) => hit.key === key) && recent.length >= max) {
+    throw new ApiError(429, 'RATE_LIMIT', 'ส่งคำขอจองถี่เกินไปจากบัญชีนี้ รอสักครู่แล้วลองใหม่')
+  }
+  if (!recent.some((hit) => hit.key === key)) recent.push({ at: now, key })
+  userBookingHits.set(userId, recent)
+}
 
 const passwordSchema = z
   .string()
@@ -104,8 +119,28 @@ const bookingSchema = z.object({
 
 export const api = Router()
 
-api.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'musc-sportspace' })
+api.get(
+  '/health',
+  asyncRoute(async (_req, res) => {
+    const started = Date.now()
+    try {
+      await getPrisma().$queryRaw`SELECT 1`
+      res.json({
+        ok: true,
+        service: 'musc-sportspace',
+        db: 'up',
+        dbLatencyMs: Date.now() - started,
+        uptimeSec: Math.round(process.uptime()),
+        viewers: clientCount(),
+      })
+    } catch {
+      res.status(503).json({ ok: false, service: 'musc-sportspace', db: 'down', viewers: clientCount() })
+    }
+  }),
+)
+
+api.get('/ready', (_req, res) => {
+  res.redirect(307, '/api/health')
 })
 
 api.get('/meta', (_req, res) => {
@@ -188,7 +223,6 @@ api.get(
   '/facilities',
   optionalAuth,
   asyncRoute(async (req, res) => {
-    await sweep()
     const prisma = getPrisma()
     const date = typeof req.query.date === 'string' && isValidDate(req.query.date) ? req.query.date : bangkokNowParts().date
     const facilities = await prisma.facility.findMany({
@@ -242,7 +276,6 @@ api.get(
   '/schedule',
   optionalAuth,
   asyncRoute(async (req, res) => {
-    await sweep()
     const from = String(req.query.from || '')
     const to = String(req.query.to || '')
     if (!isValidDate(from) || !isValidDate(to) || to < from) {
@@ -253,7 +286,10 @@ api.get(
     const bookings = await getPrisma().booking.findMany({
       where: {
         date: { gte: from, lte: to },
-        status: { in: ['PENDING_OTP', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED'] },
+        OR: [
+          { status: { in: ['CONFIRMED', 'CHECKED_IN', 'COMPLETED'] } },
+          { status: 'PENDING_OTP', otp: { consumed: false, expiresAt: { gt: new Date() } } },
+        ],
       },
       include: { facility: true, user: { select: { name: true } } },
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
@@ -340,10 +376,14 @@ api.get(
 api.post(
   '/bookings',
   requireAuth,
+  bookingIpLimiter,
   asyncRoute(async (req, res) => {
     const input = parseBody(bookingSchema, req.body)
-    const result = await createBooking(currentUser(req), input)
-    res.status(201).json(result)
+    const user = currentUser(req)
+    const headerKey = req.get('Idempotency-Key')?.trim().slice(0, 80)
+    assertUserBookingRate(user.id, headerKey)
+    const result = await createBooking(user, { ...input, idempotencyKey: headerKey || undefined })
+    res.status(result.replayed ? 200 : 201).json(result)
   }),
 )
 
