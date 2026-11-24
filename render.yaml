@@ -1,0 +1,42 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# New > Blueprint, then connect the GitHub repo. The Docker start command
+# runs prisma db push and the idempotent seed, so demo accounts exist after
+# the first boot and are not duplicated on later restarts.
+
+databases:
+  - name: musc-sportspace-db
+    databaseName: sportspace
+    user: sportspace
+    plan: free
+    postgresMajorVersion: "16"
+    ipAllowList: []
+
+services:
+  - type: web
+    name: musc-sportspace
+    runtime: docker
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: musc-sportspace-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: HOLD_SECONDS
+        value: "90"
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: BOOKING_USER_LIMIT
+        value: "6"
+      - key: BOOKING_IP_LIMIT
+        value: "2000"

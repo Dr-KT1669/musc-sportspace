@@ -134,10 +134,15 @@ Health check path: `/api/health`
 
 ### Render
 
-1. สร้าง PostgreSQL แล้วคัดลอก Internal Database URL
-2. New Web Service จาก repo นี้ เลือก Docker
-3. ใส่ตัวแปรด้านบน Health Check Path เป็น `/api/health`
-4. ดิสก์ของเว็บไม่ต้องถาวร ข้อมูลอยู่ที่ Postgres
+ไฟล์ `render.yaml` ที่ราก repo เป็น Blueprint พร้อมใช้
+
+1. สร้าง repo สาธารณะ `musc-sportspace` แล้วเชื่อมกับ Render
+2. New > Blueprint เลือก repo นี้ Render จะสร้าง Postgres (`plan: free`) และเว็บ Docker
+3. `JWT_SECRET` ถูกสร้างให้ครั้งแรก (`generateValue: true`, `sync: false` จึงไม่ถูกสุ่มใหม่ตอนซิงก์ภายหลัง)
+4. `DATABASE_URL` ชี้ไปที่ Postgres ภายใน Health check คือ `/api/health`
+5. ตอนสตาร์ทคอนเทนเนอร์จะ `prisma db push` แล้ว seed บัญชีทดลองครั้งแรก การรีสตาร์ทไม่สร้างการจองซ้ำ
+
+ถ้าแผน `free` ของ Postgres ใช้ไม่ได้ในบัญชีนั้น ให้เปลี่ยน `plan` ใน `render.yaml` เป็น `0.1c-256mb`
 
 ### Railway
 
