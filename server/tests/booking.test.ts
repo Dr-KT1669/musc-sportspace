@@ -88,6 +88,71 @@ describe('demo student', () => {
   })
 })
 
+describe('badminton courts', () => {
+  it('publishes exactly three indoor courts and retires extras that still have bookings', async () => {
+    const prisma = getPrisma()
+    const owner = await prisma.user.findFirstOrThrow({ where: { role: 'STUDENT' } })
+    const booked = await prisma.facility.create({
+      data: {
+        slug: 'badminton-4',
+        type: 'BADMINTON',
+        nameTh: 'สนามแบดมินตัน คอร์ท 4',
+        nameEn: 'Badminton Court 4',
+        description: 'กึ่งกลางแจ้ง',
+        location: 'อาคารกิจกรรมนักศึกษา ชั้น 2',
+        openTime: '08:00',
+        closeTime: '21:00',
+        capacity: 4,
+        isActive: true,
+      },
+    })
+    await prisma.booking.create({
+      data: {
+        userId: owner.id,
+        facilityId: booked.id,
+        date: futureDate(3),
+        startTime: '10:00',
+        endTime: '11:00',
+        purpose: 'PRACTICE',
+        status: 'CONFIRMED',
+        checkInCode: 'RET404',
+        qrToken: 'retire-badminton-4',
+      },
+    })
+    await prisma.facility.create({
+      data: {
+        slug: 'badminton-9',
+        type: 'BADMINTON',
+        nameTh: 'สนามแบดมินตัน คอร์ท 9',
+        nameEn: 'Badminton Court 9',
+        description: 'กลางแจ้ง',
+        location: 'เก่า',
+        openTime: '08:00',
+        closeTime: '21:00',
+        capacity: 4,
+        isActive: true,
+      },
+    })
+
+    await runSeed()
+
+    expect((await prisma.facility.findUnique({ where: { slug: 'badminton-4' } }))?.isActive).toBe(false)
+    expect(await prisma.booking.count({ where: { facilityId: booked.id } })).toBe(1)
+    expect(await prisma.facility.findUnique({ where: { slug: 'badminton-9' } })).toBeNull()
+
+    const list = await request(app).get('/api/facilities')
+    const courts = (list.body.facilities as { slug: string; type: string; location: string; description: string }[])
+      .filter((facility) => facility.type === 'BADMINTON')
+    expect(courts.map((facility) => facility.slug).sort()).toEqual(['badminton-1', 'badminton-2', 'badminton-3'])
+    for (const court of courts) {
+      expect(court.location).toBe('อาคารสตางค์มงคลสุข')
+      expect(court.description).toContain('คอร์ทในร่ม')
+      expect(court.description).not.toMatch(/กลางแจ้ง|กึ่ง/)
+    }
+    expect((await request(app).get('/api/facilities/badminton-4')).status).toBe(404)
+  })
+})
+
 describe('booking conflicts', () => {
   it('rejects a second booking for the same slot and keeps the first hold', async () => {
     const a = await registerStudent()
@@ -257,7 +322,7 @@ describe('cancellation', () => {
   it('refuses cancellation inside the two-hour deadline', async () => {
     const user = await registerStudent()
     const created = await request(app).post('/api/bookings').set(auth(user.token)).send({
-      facilitySlug: 'badminton-4',
+      facilitySlug: 'badminton-1',
       date: futureDate(6),
       startTime: '08:00',
       endTime: '09:00',

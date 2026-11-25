@@ -7,10 +7,9 @@ import { addDays, bangkokNowParts, formatMinutes, parseMinutes } from '../server
 dotenv.config()
 
 const FACILITIES = [
-  { slug: 'badminton-1', type: 'BADMINTON', nameTh: 'สนามแบดมินตัน คอร์ท 1', nameEn: 'Badminton Court 1', description: 'คอร์ทไม้ในร่ม พื้นยางกันลื่น เหมาะซ้อมเดี่ยวและคู่', location: 'อาคารกิจกรรมนักศึกษา ชั้น 2', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 4, lightsAvailable: true, lightCoinCost: 15, sortOrder: 1 },
-  { slug: 'badminton-2', type: 'BADMINTON', nameTh: 'สนามแบดมินตัน คอร์ท 2', nameEn: 'Badminton Court 2', description: 'คอร์ทคู่กับคอร์ท 1 ไฟสปอตไลต์แยกสวิตช์', location: 'อาคารกิจกรรมนักศึกษา ชั้น 2', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 4, lightsAvailable: true, lightCoinCost: 15, sortOrder: 2 },
-  { slug: 'badminton-3', type: 'BADMINTON', nameTh: 'สนามแบดมินตัน คอร์ท 3', nameEn: 'Badminton Court 3', description: 'คอร์ทด้านใน เงียบกว่า เหมาะซ้อมตีลูก', location: 'อาคารกิจกรรมนักศึกษา ชั้น 2', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 4, lightsAvailable: true, lightCoinCost: 15, sortOrder: 3 },
-  { slug: 'badminton-4', type: 'BADMINTON', nameTh: 'สนามแบดมินตัน คอร์ท 4', nameEn: 'Badminton Court 4', description: 'คอร์ทติดทางเดิน รองรับการแข่งขันภายในชมรม', location: 'อาคารกิจกรรมนักศึกษา ชั้น 2', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 4, lightsAvailable: true, lightCoinCost: 15, sortOrder: 4 },
+  { slug: 'badminton-1', type: 'BADMINTON', nameTh: 'สนามแบดมินตัน คอร์ท 1', nameEn: 'Badminton Court 1', description: 'คอร์ทในร่ม พื้นยางกันลื่น เหมาะสำหรับการซ้อมเดี่ยวและคู่', location: 'อาคารสตางค์มงคลสุข', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 4, lightsAvailable: true, lightCoinCost: 15, sortOrder: 1 },
+  { slug: 'badminton-2', type: 'BADMINTON', nameTh: 'สนามแบดมินตัน คอร์ท 2', nameEn: 'Badminton Court 2', description: 'คอร์ทในร่ม พื้นยางกันลื่น มีไฟสปอตไลต์แยกสวิตช์', location: 'อาคารสตางค์มงคลสุข', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 4, lightsAvailable: true, lightCoinCost: 15, sortOrder: 2 },
+  { slug: 'badminton-3', type: 'BADMINTON', nameTh: 'สนามแบดมินตัน คอร์ท 3', nameEn: 'Badminton Court 3', description: 'คอร์ทในร่ม พื้นยางกันลื่น เหมาะสำหรับการซ้อมตีลูก', location: 'อาคารสตางค์มงคลสุข', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 4, lightsAvailable: true, lightCoinCost: 15, sortOrder: 3 },
   { slug: 'basketball-1', type: 'BASKETBALL', nameTh: 'สนามบาสเกตบอล', nameEn: 'Basketball Court', description: 'สนามในร่มเต็มคอร์ท ห่วงมาตรฐานและเส้นสามคะแนน', location: 'โรงยิมคณะวิทยาศาสตร์', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 10, lightsAvailable: true, lightCoinCost: 25, sortOrder: 5 },
   { slug: 'volleyball-1', type: 'VOLLEYBALL', nameTh: 'สนามวอลเลย์บอล', nameEn: 'Volleyball Court', description: 'พื้นไม้และตาข่ายปรับความสูงได้ ทั้งในร่ม', location: 'โรงยิมคณะวิทยาศาสตร์', openTime: '08:00', closeTime: '20:00', slotMinutes: 60, maxHours: 2, capacity: 12, lightsAvailable: true, lightCoinCost: 25, sortOrder: 6 },
   { slug: 'tt-1', type: 'TABLE_TENNIS', nameTh: 'โต๊ะปิงปอง 1', nameEn: 'Table Tennis 1', description: 'โต๊ะแข่งขัน พื้นที่ด้านข้างกว้างพอสำหรับคู่', location: 'โถงกีฬา ชั้น 1', openTime: '08:00', closeTime: '21:00', slotMinutes: 60, maxHours: 2, capacity: 4, lightsAvailable: true, lightCoinCost: 10, sortOrder: 7 },
@@ -118,9 +117,23 @@ export async function runSeed() {
         lightsAvailable: facility.lightsAvailable,
         maxHours: facility.maxHours,
         capacity: facility.capacity,
+        isActive: true,
       },
       create: { ...facility, isActive: true },
     })
+  }
+
+  const activeBadminton = FACILITIES.filter((facility) => facility.type === 'BADMINTON').map((facility) => facility.slug)
+  const retiredBadminton = await prisma.facility.findMany({
+    where: { type: 'BADMINTON', slug: { notIn: activeBadminton } },
+    include: { _count: { select: { bookings: true } } },
+  })
+  for (const extra of retiredBadminton) {
+    if (extra._count.bookings > 0) {
+      await prisma.facility.update({ where: { id: extra.id }, data: { isActive: false } })
+    } else {
+      await prisma.facility.delete({ where: { id: extra.id } })
+    }
   }
 
   for (const item of EQUIPMENT) {
@@ -218,7 +231,7 @@ export async function runSeed() {
   await book({ studentId: 'STF10234', slug: 'basketball-1', day: 0, start: '15:00', hours: 2, purpose: 'COMPETITION', activityName: 'บาสเกตบอลภายในภาควิชา', lightsOn: true })
   await book({ studentId: '66380022', slug: 'badminton-2', day: 0, start: '14:00', hours: 2, lightsOn: true })
   await book({ studentId: '66380011', slug: 'badminton-3', day: 0, start: '16:00', hours: 2, lightsOn: true })
-  await book({ studentId: '66380022', slug: 'badminton-4', day: 0, start: '16:00', hours: 1 })
+  await book({ studentId: '66380022', slug: 'badminton-1', day: 2, start: '10:00', hours: 1 })
   await book({ studentId: '66380011', slug: 'tt-1', day: 0, start: '13:00', hours: 1 })
   await book({ studentId: '66385678', slug: 'tt-2', day: 0, start: '18:00', hours: 1 })
 

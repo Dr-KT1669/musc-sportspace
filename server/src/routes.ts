@@ -254,7 +254,7 @@ api.get(
       where: { slug: req.params.slug },
       include: { closures: true },
     })
-    if (!facility) throw new ApiError(404, 'NOT_FOUND', 'ไม่พบสนาม')
+    if (!facility || !facility.isActive) throw new ApiError(404, 'NOT_FOUND', 'ไม่พบสนาม')
     res.json({ facility: publicFacility(facility) })
   }),
 )
