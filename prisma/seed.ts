@@ -42,14 +42,39 @@ type SeedUser = {
   coins: number
 }
 
+const LEGACY_DEMO_STUDENT_ID = '66381234'
+
 const USERS: SeedUser[] = [
-  { studentId: '66381234', name: 'กัญญานนท์ ขาวเอียด', email: 'kannanon.kha@student.mahidol.ac.th', phone: '0812345678', department: 'ภาควิชาวิทยาการคอมพิวเตอร์', role: 'STUDENT', coins: 120 },
+  { studentId: '6705023', name: 'ทัญชานนท์ ขาวเอียด', email: 'thanchanon.kha@student.mahidol.ac.th', phone: '0812345678', department: 'ภาควิชาวิทยาการคอมพิวเตอร์', role: 'STUDENT', coins: 120 },
   { studentId: '66385678', name: 'สิริกร พงษ์ทอง', email: 'sirikorn.pon@student.mahidol.ac.th', phone: '0891112233', department: 'ภาควิชาชีววิทยา', role: 'STUDENT', coins: 120 },
   { studentId: '66380011', name: 'อนันต์ เขียวขจี', email: 'anan.k@student.mahidol.ac.th', phone: '0865550101', department: 'ภาควิชาเคมี', role: 'STUDENT', coins: 200 },
   { studentId: '66380022', name: 'มินตรา ศรีจันทร์', email: 'mintra.s@student.mahidol.edu', phone: '0823334455', department: 'ภาควิชาฟิสิกส์', role: 'STUDENT', coins: 200 },
   { studentId: 'STF10234', name: 'ดร.ปิยะ วัฒนกุล', email: 'piya.wat@mahidol.edu', phone: '0819001122', department: 'งานกิจการนักศึกษา', role: 'STAFF', coins: 300 },
   { studentId: 'ADM10001', name: 'วราภรณ์ ตั้งตรง', email: 'waraporn.tan@mahidol.ac.th', phone: '0801239876', department: 'หน่วยสนามกีฬา คณะวิทยาศาสตร์', role: 'ADMIN', coins: 500 },
 ]
+
+/** Production already has the old demo student. Rename that row so bookings stay attached. */
+async function migrateLegacyDemoStudent(prisma: ReturnType<typeof getPrisma>, passwordHash: string) {
+  const next = USERS.find((user) => user.studentId === '6705023')
+  if (!next) return
+  const legacy = await prisma.user.findUnique({ where: { studentId: LEGACY_DEMO_STUDENT_ID } })
+  if (!legacy) return
+  const taken = await prisma.user.findUnique({ where: { studentId: next.studentId } })
+  if (taken && taken.id !== legacy.id) {
+    console.warn(`Demo student ${next.studentId} already exists; left ${LEGACY_DEMO_STUDENT_ID} in place.`)
+    return
+  }
+  const emailOwner = await prisma.user.findUnique({ where: { email: next.email } })
+  await prisma.user.update({
+    where: { id: legacy.id },
+    data: {
+      studentId: next.studentId,
+      name: next.name,
+      email: emailOwner && emailOwner.id !== legacy.id ? legacy.email : next.email,
+      passwordHash,
+    },
+  })
+}
 
 function code() {
   return randomBytes(4).toString('hex').toUpperCase().slice(0, 6)
@@ -60,12 +85,15 @@ export async function runSeed() {
   const prisma = getPrisma()
   const passwordHash = await bcrypt.hash('Sport@123', 10)
   const users = new Map<string, { id: string }>()
+  await migrateLegacyDemoStudent(prisma, passwordHash)
 
   for (const user of USERS) {
     const { coins, ...profile } = user
     const saved = await prisma.user.upsert({
       where: { studentId: user.studentId },
-      update: {},
+      update: user.studentId === '6705023'
+        ? { name: user.name, email: user.email, passwordHash }
+        : {},
       create: {
         ...profile,
         passwordHash,
@@ -194,9 +222,9 @@ export async function runSeed() {
   await book({ studentId: '66380011', slug: 'tt-1', day: 0, start: '13:00', hours: 1 })
   await book({ studentId: '66385678', slug: 'tt-2', day: 0, start: '18:00', hours: 1 })
 
-  await book({ studentId: '66381234', slug: 'badminton-2', day: 1, start: '18:00', hours: 1, lightsOn: false })
-  await book({ studentId: '66381234', slug: 'fitness-1', day: -1, start: '17:00', hours: 1, status: 'COMPLETED' })
-  await book({ studentId: '66381234', slug: 'badminton-1', day: -3, start: '16:00', hours: 1, lightsOn: true, status: 'COMPLETED' })
+  await book({ studentId: '6705023', slug: 'badminton-2', day: 1, start: '18:00', hours: 1, lightsOn: false })
+  await book({ studentId: '6705023', slug: 'fitness-1', day: -1, start: '17:00', hours: 1, status: 'COMPLETED' })
+  await book({ studentId: '6705023', slug: 'badminton-1', day: -3, start: '16:00', hours: 1, lightsOn: true, status: 'COMPLETED' })
   await book({ studentId: 'STF10234', slug: 'volleyball-1', day: 1, start: '09:00', hours: 2, purpose: 'CLUB', activityName: 'วอลเลย์บอลบุคลากร' })
   await book({ studentId: '66380022', slug: 'pool-1', day: 1, start: '07:00', hours: 1 })
   await book({ studentId: '66380011', slug: 'football-1', day: 2, start: '08:00', hours: 2 })

@@ -56,6 +56,38 @@ afterAll(async () => {
   await getPrisma().$disconnect()
 })
 
+describe('demo student', () => {
+  it('renames the legacy 66381234 demo student to 6705023 and keeps the same password', async () => {
+    const prisma = getPrisma()
+    const seeded = await prisma.user.findUnique({ where: { studentId: '6705023' } })
+    expect(seeded?.name).toBe('ทัญชานนท์ ขาวเอียด')
+    expect(seeded?.email).toBe('thanchanon.kha@student.mahidol.ac.th')
+
+    await prisma.user.update({
+      where: { id: seeded!.id },
+      data: {
+        studentId: '66381234',
+        name: 'กัญญานนท์ ขาวเอียด',
+        email: 'kannanon.kha@student.mahidol.ac.th',
+      },
+    })
+
+    await runSeed()
+
+    const renamed = await prisma.user.findUnique({ where: { studentId: '6705023' } })
+    expect(renamed?.id).toBe(seeded!.id)
+    expect(renamed?.name).toBe('ทัญชานนท์ ขาวเอียด')
+    expect(renamed?.email).toBe('thanchanon.kha@student.mahidol.ac.th')
+    expect(await prisma.user.findUnique({ where: { studentId: '66381234' } })).toBeNull()
+
+    const loginRes = await request(app).post('/api/auth/login').send({ studentId: '6705023', password: 'Sport@123' })
+    expect(loginRes.status).toBe(200)
+    expect(loginRes.body.user.name).toBe('ทัญชานนท์ ขาวเอียด')
+    const oldLogin = await request(app).post('/api/auth/login').send({ studentId: '66381234', password: 'Sport@123' })
+    expect(oldLogin.status).toBe(401)
+  })
+})
+
 describe('booking conflicts', () => {
   it('rejects a second booking for the same slot and keeps the first hold', async () => {
     const a = await registerStudent()

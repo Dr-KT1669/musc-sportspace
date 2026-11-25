@@ -47,7 +47,7 @@ docker compose up --build
 
 | บทบาท | รหัส | ชื่อ | อีเมล | เหรียญหลังข้อมูลตัวอย่าง |
 | --- | --- | --- | --- | --- |
-| นักศึกษา | `66381234` | กัญญานนท์ ขาวเอียด | kannanon.kha@student.mahidol.ac.th | 105 |
+| นักศึกษา | `6705023` | ทัญชานนท์ ขาวเอียด | thanchanon.kha@student.mahidol.ac.th | 105 |
 | นักศึกษา | `66385678` | สิริกร พงษ์ทอง | sirikorn.pon@student.mahidol.ac.th | 120 |
 | บุคลากร | `STF10234` | ดร.ปิยะ วัฒนกุล | piya.wat@mahidol.edu | 130 |
 | ผู้ดูแลสนาม | `ADM10001` | วราภรณ์ ตั้งตรง | waraporn.tan@mahidol.ac.th | 500 |
