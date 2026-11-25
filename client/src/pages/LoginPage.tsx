@@ -2,7 +2,6 @@ import { motion } from 'framer-motion'
 import { Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Logo } from '../components/Sports'
 import { Button, Field } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -10,8 +9,15 @@ import { useToast } from '../context/ToastContext'
 import { ApiError, api } from '../lib/api'
 import type { User } from '../lib/types'
 
+const HERO_SPORTS = [
+  { src: '/hero/badminton.webp', label: 'แบดมินตัน', position: 'object-center' },
+  { src: '/hero/basketball.webp', label: 'บาสเกตบอล', position: 'object-[center_32%]' },
+  { src: '/hero/football.webp', label: 'ฟุตบอล', position: 'object-center' },
+  { src: '/hero/swimming.webp', label: 'ว่ายน้ำ', position: 'object-center' },
+] as const
+
 const DEMOS = [
-  { label: 'นักศึกษา', id: '66381234' },
+  { label: 'นักศึกษา', id: '6705023' },
   { label: 'บุคลากร', id: 'STF10234' },
   { label: 'ผู้ดูแลสนาม', id: 'ADM10001' },
 ]
@@ -81,37 +87,60 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.15fr_0.85fr]">
-      <section className="relative overflow-hidden bg-navy-900 text-white">
-        <div className="court-lines absolute inset-0 opacity-70" />
-        <div className="absolute -left-20 top-10 h-72 w-72 rounded-full bg-gold-400/20 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-500/20 blur-3xl" />
-        <svg className="absolute inset-x-8 top-24 hidden h-64 w-[80%] opacity-40 md:block" viewBox="0 0 600 240" fill="none">
+      <section className="relative overflow-hidden bg-navy-950 text-white">
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
+            {HERO_SPORTS.map((sport) => (
+              <img key={sport.src} src={sport.src} alt="" className={`h-full w-full scale-110 object-cover blur-[2px] ${sport.position}`} />
+            ))}
+          </div>
+          <div className="absolute inset-0 bg-navy-950/50 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-gradient-to-b from-navy-950/82 via-navy-900/80 to-navy-950/94" />
+          <div className="court-lines absolute inset-0 opacity-30" />
+          <div className="absolute -left-20 top-10 h-72 w-72 rounded-full bg-gold-400/20 blur-3xl" />
+          <div className="absolute bottom-10 right-0 h-72 w-72 rounded-full bg-sky-500/15 blur-3xl" />
+        </div>
+        <svg className="pointer-events-none absolute inset-x-8 top-28 hidden h-52 w-[76%] opacity-25 lg:block" viewBox="0 0 600 240" fill="none" aria-hidden="true">
           <rect x="8" y="8" width="584" height="224" rx="28" stroke="white" strokeWidth="2" />
           <path className="dash" d="M300 8v224M8 120h584" stroke="#f5c542" strokeWidth="2" />
           <circle cx="300" cy="120" r="42" stroke="#d6ff4a" strokeWidth="2" />
         </svg>
-        <div className="relative flex min-h-[42vh] flex-col justify-between p-6 sm:p-10 lg:min-h-screen">
-          <div className="flex items-center justify-between">
+        <div className="relative flex min-h-[46vh] flex-col justify-between p-6 sm:p-10 lg:min-h-screen">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Logo />
+              <img
+                src="/hero/mahidol-seal.svg"
+                alt="ตราสัญลักษณ์มหาวิทยาลัยมหิดล"
+                width={80}
+                height={80}
+                className="h-14 w-14 shrink-0 rounded-full bg-white object-contain shadow-[0_0_0_2px_rgba(245,197,66,0.9),0_12px_28px_-14px_rgba(0,0,0,0.85)] sm:h-[4.5rem] sm:w-[4.5rem]"
+              />
               <div>
                 <p className="font-display text-xl font-semibold leading-none">MUSC SportSpace</p>
                 <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gold-300">Faculty of Science</p>
               </div>
             </div>
-            <button onClick={toggle} className="grid h-10 w-10 place-items-center rounded-full bg-white/10" aria-label="สลับโหมดสี">
+            <button onClick={toggle} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10" aria-label="สลับโหมดสี">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
           </div>
-          <div className="max-w-xl py-10">
+          <div className="max-w-xl py-8">
             <p className="text-sm text-gold-300">ระบบจองสนามกีฬาและอุปกรณ์กีฬาออนไลน์</p>
             <h1 className="mt-3 font-display text-4xl font-semibold leading-tight sm:text-6xl">จองคอร์ท ก่อนเพื่อนจะกดทัน</h1>
-            <p className="mt-4 max-w-md text-white/75">แบดมินตัน บาสเกตบอล วอลเลย์บอล ปิงปอง ฟิตเนส ฟุตบอล และสระว่ายน้ำ — ยืนยันด้วย OTP อีเมลสถาบัน แล้วพก QR ไปเช็คอินหน้าสนาม</p>
+            <p className="mt-4 max-w-md text-white/80">แบดมินตัน บาสเกตบอล วอลเลย์บอล ปิงปอง ฟิตเนส ฟุตบอล และสระว่ายน้ำ — ยืนยันด้วย OTP อีเมลสถาบัน แล้วพก QR ไปเช็คอินหน้าสนาม</p>
             {free !== null && (
               <p className="mt-6 inline-flex rounded-full bg-white/10 px-4 py-2 text-sm">วันนี้ยังว่าง <span className="mx-1 font-semibold text-court">{free}</span> ช่วงเวลา</p>
             )}
+            <ul className="mt-8 grid grid-cols-4 gap-2 sm:gap-3">
+              {HERO_SPORTS.map((sport) => (
+                <li key={sport.label} className="relative overflow-hidden rounded-2xl shadow-lg shadow-black/30 ring-1 ring-white/25">
+                  <img src={sport.src} alt={sport.label} className={`aspect-[5/4] w-full object-cover sm:aspect-[4/3] ${sport.position}`} />
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-navy-950/90 via-navy-950/45 to-transparent px-1.5 pb-1.5 pt-6 text-[10px] font-medium text-white sm:px-2 sm:text-xs">{sport.label}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <p className="text-xs text-white/50">คณะวิทยาศาสตร์ มหาวิทยาลัยมหิดล · Salaya</p>
+          <p className="text-xs text-white/60">คณะวิทยาศาสตร์ มหาวิทยาลัยมหิดล · Salaya</p>
         </div>
       </section>
 

@@ -1,0 +1,24 @@
+Login hero assets for MUSC SportSpace. Photos were cropped for framing and recompressed as WebP.
+
+Mahidol University seal
+  File: mahidol-seal.svg
+  Source: https://commons.wikimedia.org/wiki/File:Mahidol_U.svg
+  Direct file: https://upload.wikimedia.org/wikipedia/commons/9/9c/Mahidol_U.svg
+  Author: Mahidol University
+  Origin: Announcement of Mahidol University regarding the Mahidol University emblem (No. 2) B.E. 2563
+  License: Public domain under section 7 of the Thai Copyright Act B.E. 2537 (1994) (Wikimedia template PD-TH-exempt). Wikimedia also marks the file as official insignia; that note is separate from copyright.
+
+Sports photographs (Pexels License, https://www.pexels.com/license/ — free to use and modify; attribution not required)
+  badminton.webp
+    https://www.pexels.com/photo/green-and-white-court-with-badminton-rackets-3660204/
+    Photographer: Eric Anada
+  basketball.webp
+    https://www.pexels.com/photo/358042/
+    A basketball resting on a hoop. Embedded metadata did not name a photographer.
+  football.webp
+    https://www.pexels.com/photo/399187/
+    Night football pitch under floodlights.
+    Embedded metadata: artist Grizzlybear.se, Creative Commons Zero (CC0).
+  swimming.webp
+    https://www.pexels.com/photo/863988/
+    Overhead view of a swimmer. Embedded metadata did not name a photographer.
