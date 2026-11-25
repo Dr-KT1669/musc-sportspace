@@ -2,12 +2,14 @@ import { motion } from 'framer-motion'
 import { Check, Lightbulb, LightbulbOff, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { OtpHoldPanel } from '../components/OtpHoldPanel'
 import { SportArt, sportOf } from '../components/Sports'
 import { Button, Field, Skeleton } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { ApiError, api } from '../lib/api'
 import { addDays, cn, formatThaiDate, todayIso } from '../lib/format'
+import { saveHold, type ActiveHold } from '../lib/hold'
 import type { Booking, Facility, Slot } from '../lib/types'
 
 type Mate = { name: string; email: string; phone: string; department: string }
@@ -36,15 +38,27 @@ export default function BookPage() {
   const [equipment, setEquipment] = useState<Eq[]>([])
   const [qty, setQty] = useState<Record<string, number>>({})
   const [booking, setBooking] = useState<Booking | null>(null)
-  const [expires, setExpires] = useState<string>('')
-  const [code, setCode] = useState('')
+  const [hold, setHold] = useState<ActiveHold | null>(null)
   const [busy, setBusy] = useState(false)
-  const [left, setLeft] = useState('')
   const [lost, setLost] = useState('')
   const idempotencyKey = useRef('')
   const submitting = useRef(false)
   const startRef = useRef('')
   const stepRef = useRef(step)
+
+  useEffect(() => {
+    if (!user) return
+    let stop = false
+    api<{ hold: ActiveHold | null }>('/api/bookings/hold')
+      .then((data) => {
+        if (stop || !data.hold || data.hold.facilitySlug !== slug) return
+        saveHold(data.hold)
+        setHold(data.hold)
+        setStep('otp')
+      })
+      .catch(() => {})
+    return () => { stop = true }
+  }, [user, slug])
 
   useEffect(() => {
     api<{ facility: Facility }>(`/api/facilities/${slug}`)
@@ -99,23 +113,11 @@ export default function BookPage() {
     const key = `${date}:${start}`
     if (warnedSlot.current === key) return
     warnedSlot.current = key
-    setLost('ช่วงนี้ถูกจองไปก่อนคุณแล้ว')
+    setLost('ช่วงเวลานี้มีการจองแล้ว')
     setStart('')
     setStep('time')
-    toast.push('ช่วงนี้ถูกจองไปก่อนคุณแล้ว เลือกช่วงใหม่ได้เลย', 'err')
+    toast.push('ช่วงเวลานี้มีการจองแล้ว กรุณาเลือกช่วงเวลาอื่น', 'err')
   }, [slots, start, step, date, toast])
-
-  useEffect(() => {
-    if (!expires || step !== 'otp') return
-    const tick = () => {
-      const ms = new Date(expires).getTime() - Date.now()
-      if (ms <= 0) setLeft('หมดเวลา')
-      else setLeft(`${Math.floor(ms / 60000)}:${String(Math.floor((ms / 1000) % 60)).padStart(2, '0')}`)
-    }
-    tick()
-    const timer = window.setInterval(tick, 250)
-    return () => clearInterval(timer)
-  }, [expires, step])
 
   const end = useMemo(() => {
     if (!start || !facility) return ''
@@ -177,12 +179,23 @@ export default function BookPage() {
           equipment: chosen,
         }),
       })
+      const nextHold: ActiveHold = {
+        bookingId: data.booking.id,
+        facilitySlug: slug,
+        facilityName: facility?.nameTh || data.booking.facility.nameTh,
+        date: data.booking.date,
+        startTime: data.booking.startTime,
+        endTime: data.booking.endTime,
+        expiresAt: data.otpExpiresAt,
+        secondsLeft: Math.max(0, Math.ceil((new Date(data.otpExpiresAt).getTime() - Date.now()) / 1000)),
+      }
+      saveHold(nextHold)
+      setHold(nextHold)
       setBooking(data.booking)
-      setExpires(data.otpExpiresAt)
       setCoins(data.coinBalance)
       setStep('otp')
       setLost('')
-      toast.push(data.replayed ? 'ใช้คำขอเดิมที่ส่งไปแล้ว' : 'ส่งรหัส OTP ไปที่อีเมลสถาบันแล้ว', 'ok')
+      toast.push(data.replayed ? 'ระบบใช้คำขอเดิมที่ส่งไว้แล้ว' : 'ระบบได้ส่งรหัส OTP ไปยังอีเมลสถาบันแล้ว', 'ok')
     } catch (error) {
       const message = error instanceof ApiError ? error.message : 'จองไม่สำเร็จ'
       if (error instanceof ApiError && (error.code === 'SLOT_TAKEN' || error.code === 'HOLD_EXISTS')) {
@@ -195,24 +208,6 @@ export default function BookPage() {
       toast.push(message, 'err')
     } finally {
       submitting.current = false
-      setBusy(false)
-    }
-  }
-
-  async function confirmOtp() {
-    if (!booking) return
-    setBusy(true)
-    try {
-      const data = await api<{ booking: Booking; coinBalance: number }>(`/api/bookings/${booking.id}/otp`, {
-        method: 'POST',
-        body: JSON.stringify({ code }),
-      })
-      setBooking(data.booking)
-      setCoins(data.coinBalance)
-      setStep('done')
-    } catch (error) {
-      toast.push(error instanceof ApiError ? error.message : 'ยืนยันไม่สำเร็จ', 'err')
-    } finally {
       setBusy(false)
     }
   }
@@ -332,16 +327,12 @@ export default function BookPage() {
           </div>
         )}
 
-        {step === 'otp' && booking && (
-          <div className="mx-auto max-w-md text-center">
-            <p className="text-sm text-slate-500">รหัส 6 หลักถูกส่งไปที่</p>
-            <p className="font-semibold">{user?.email}</p>
-            <p className="mt-2 text-sm">เหลือเวลา {left || '...'}</p>
-            <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" aria-label="รหัส OTP" className="mt-4 w-full rounded-3xl border px-4 py-4 text-center font-display text-3xl tracking-[0.4em] dark:border-white/10 dark:bg-transparent" />
-            <Button className="mt-4 w-full" variant="gold" disabled={busy || code.length !== 6} onClick={confirmOtp}>ยืนยันการจอง</Button>
-            <p className="mt-3 text-sm text-slate-500">ถ้าไม่ยืนยันก่อนหมดเวลา ช่วงนี้จะกลับไปให้คนที่รออยู่</p>
-            <p className="mt-1 text-sm text-slate-500">ทดลองโดยไม่ใช้อีเมลจริง? เปิด <Link className="underline" to="/dev-mail">กล่องจดหมายทดลอง</Link></p>
-          </div>
+        {step === 'otp' && hold && (
+          <OtpHoldPanel
+            hold={hold}
+            onConfirmed={(next) => { setBooking(next); setHold(null); setStep('done') }}
+            onReleased={(message) => { setHold(null); setLost(message); setStep('time') }}
+          />
         )}
 
         {step === 'done' && booking && (
@@ -351,7 +342,7 @@ export default function BookPage() {
             <p className="text-slate-500">{facility.nameTh} · {formatThaiDate(booking.date)} · {booking.startTime}–{booking.endTime}</p>
             {booking.qrDataUrl && <img src={booking.qrDataUrl} alt="QR ยืนยันการจอง" className="mx-auto mt-4 h-56 w-56 rounded-3xl bg-white p-3" />}
             <p className="mt-2 font-display text-2xl tracking-[0.3em]">{booking.checkInCode}</p>
-            <p className="text-sm text-slate-500">แสดง QR นี้ที่หน้าสนามเพื่อเช็คอิน</p>
+            <p className="text-sm text-slate-500">โปรดแสดงรหัส QR นี้แก่เจ้าหน้าที่ ณ สนามเพื่อเช็คอิน</p>
             <div className="mt-4 flex justify-center gap-2">
               <Link to={`/bookings/${booking.id}`} className="rounded-2xl bg-navy-900 px-4 py-3 text-sm font-semibold text-white">ดูรายละเอียด</Link>
               <Link to="/calendar" className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold ring-1 ring-slate-200">กลับปฏิทิน</Link>

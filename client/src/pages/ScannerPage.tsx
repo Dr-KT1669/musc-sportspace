@@ -58,7 +58,7 @@ export default function ScannerPage() {
     try {
       const data = await api<Result>('/api/admin/checkin', { method: 'POST', body: JSON.stringify({ code: value }) })
       setResult(data)
-      toast.push(data.alreadyCheckedIn ? 'เช็คอินไปแล้วก่อนหน้านี้' : 'เช็คอินสำเร็จ', 'ok')
+      toast.push(data.alreadyCheckedIn ? 'รายการนี้ได้ดำเนินการเช็คอินแล้ว' : 'เช็คอินเรียบร้อยแล้ว', 'ok')
       setCode('')
     } catch (error) {
       toast.push(error instanceof ApiError ? error.message : 'เช็คอินไม่สำเร็จ', 'err')
@@ -73,7 +73,7 @@ export default function ScannerPage() {
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="glass rounded-[28px] p-4">
         <h1 className="font-display text-3xl font-semibold">สแกนเช็คอิน</h1>
-        <p className="mb-3 text-sm text-slate-500">สแกน QR จากมือถือผู้จอง หรือกรอกรหัส 6 ตัว</p>
+        <p className="mb-3 text-sm text-slate-500">สแกนรหัส QR จากอุปกรณ์ของผู้จอง หรือกรอกรหัส 6 หลัก</p>
         <div id={regionId} className="overflow-hidden rounded-3xl bg-navy-950" />
         {cameraError && <p className="mt-2 text-sm text-amber-700">{cameraError}</p>}
         <form className="mt-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); void submit(code) }}>

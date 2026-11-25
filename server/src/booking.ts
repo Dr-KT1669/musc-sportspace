@@ -335,7 +335,7 @@ export async function createBooking(
         const holds = await tx.booking.count({ where: { userId: user.id, status: 'PENDING_OTP' } })
         if (holds > 0) {
           throw new TxAbort(
-            new ApiError(409, 'HOLD_EXISTS', `คุณมีช่วงเวลาที่กำลังยืนยันอยู่ ยืนยันภายใน ${holdSeconds()} วินาที หรือรอให้หมดเวลาก่อนจองช่วงใหม่`),
+            new ApiError(409, 'HOLD_EXISTS', `ท่านมีรายการที่รอการยืนยันรหัส OTP อยู่ กรุณายืนยันภายใน ${holdSeconds()} วินาที หรือรอให้รายการหมดเวลาก่อนจองช่วงใหม่`),
           )
         }
         const activeNow = await tx.booking.count({
@@ -436,7 +436,7 @@ export async function createBooking(
         },
       })
       if (own) return finishBooking(user, own.id, true)
-      throw new ApiError(409, 'SLOT_TAKEN', 'มีคนจองช่วงนี้ไปก่อนคุณแล้ว กรุณาเลือกช่วงอื่น')
+      throw new ApiError(409, 'SLOT_TAKEN', 'ช่วงเวลานี้มีการจองแล้ว กรุณาเลือกช่วงเวลาอื่น')
     }
     throw error
   }
@@ -662,6 +662,33 @@ const bookingInclude = {
 
 export async function loadBooking(id: string) {
   return getPrisma().booking.findUnique({ where: { id }, include: bookingInclude })
+}
+
+export async function getActiveHold(userId: string) {
+  await sweep()
+  const booking = await getPrisma().booking.findFirst({
+    where: {
+      userId,
+      status: 'PENDING_OTP',
+      otp: { consumed: false, expiresAt: { gt: new Date() } },
+    },
+    include: bookingInclude,
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!booking?.otp) return { hold: null }
+  const expiresAt = booking.otp.expiresAt
+  return {
+    hold: {
+      bookingId: booking.id,
+      facilitySlug: booking.facility.slug,
+      facilityName: booking.facility.nameTh,
+      date: booking.date,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      expiresAt: expiresAt.toISOString(),
+      secondsLeft: Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 1000)),
+    },
+  }
 }
 
 type LoadedBooking = NonNullable<Awaited<ReturnType<typeof loadBooking>>>

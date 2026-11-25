@@ -17,6 +17,7 @@ import {
   cancelBooking,
   checkIn,
   createBooking,
+  getActiveHold,
   getAvailability,
   loadBooking,
   publicFacility,
@@ -428,6 +429,14 @@ api.get(
         serializeBooking(booking, { revealSecrets: booking.userId === user.id }),
       ),
     })
+  }),
+)
+
+api.get(
+  '/bookings/hold',
+  requireAuth,
+  asyncRoute(async (req, res) => {
+    res.json(await getActiveHold(currentUser(req).id))
   }),
 )
 

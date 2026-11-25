@@ -5,8 +5,20 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { api } from '../lib/api'
 import { cn, roleLabel } from '../lib/format'
-import { Logo } from './Sports'
+import { HoldBanner } from './HoldBanner'
 import { Skeleton } from './ui'
+
+function Seal({ className = 'h-12 w-12' }: { className?: string }) {
+  return (
+    <img
+      src="/hero/mahidol-seal.svg"
+      alt="ตราสัญลักษณ์มหาวิทยาลัยมหิดล"
+      width={64}
+      height={64}
+      className={`${className} shrink-0 rounded-full bg-white object-contain ring-2 ring-gold-400 shadow-sm`}
+    />
+  )
+}
 
 const links = [
   { to: '/calendar', label: 'ปฏิทิน', icon: CalendarDays },
@@ -71,7 +83,7 @@ export function Layout({ devMail }: { devMail: boolean }) {
       )}
       {devMail && (
         <NavLink to="/dev-mail" onClick={() => setOpen(false)} className={({ isActive }) => cn('flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm', isActive ? 'bg-gold-400 text-navy-950' : 'text-white/80 hover:bg-white/10')}>
-          <Mail size={18} /> จดหมายทดลอง
+          <Mail size={18} /> จดหมายทดสอบ
         </NavLink>
       )}
     </>
@@ -81,11 +93,11 @@ export function Layout({ devMail }: { devMail: boolean }) {
     <div className="bg-app min-h-screen">
       <a href="#content" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[90] focus:rounded-xl focus:bg-white focus:px-3 focus:py-2">ข้ามไปเนื้อหา</a>
       <aside className="no-print fixed inset-y-0 left-0 z-40 hidden w-[250px] flex-col bg-navy-900 px-4 py-5 text-white lg:flex">
-        <div className="flex items-center gap-3 px-2">
-          <Logo />
+        <div className="flex items-center gap-3 px-1">
+          <Seal />
           <div>
-            <p className="font-display text-lg font-semibold leading-none">SportSpace</p>
-            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-gold-300">MUSC Science</p>
+            <p className="font-display text-sm font-semibold leading-tight">MUSC SportSpace</p>
+            <p className="mt-1 text-[11px] leading-tight text-gold-300">คณะวิทยาศาสตร์ มหิดล</p>
           </div>
         </div>
         <nav className="mt-8 flex flex-1 flex-col gap-1">{nav}</nav>
@@ -101,8 +113,8 @@ export function Layout({ devMail }: { devMail: boolean }) {
       <div className="lg:pl-[250px]">
         <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/40 bg-white/70 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-navy-950/70">
           <div className="flex items-center gap-2 lg:hidden">
-            <Logo className="h-9 w-9" />
-            <span className="font-display font-semibold">SportSpace</span>
+            <Seal className="h-10 w-10" />
+            <span className="font-display text-sm font-semibold leading-tight">MUSC SportSpace</span>
           </div>
           <p className="hidden text-sm text-slate-500 dark:text-slate-400 lg:block">คณะวิทยาศาสตร์ มหาวิทยาลัยมหิดล</p>
           <div className="flex items-center gap-2">
@@ -127,8 +139,11 @@ export function Layout({ devMail }: { devMail: boolean }) {
           <div className="no-print fixed inset-0 z-50 lg:hidden">
             <button className="absolute inset-0 bg-black/50" aria-label="ปิดเมนู" onClick={() => setOpen(false)} />
             <div className="absolute inset-y-0 left-0 flex w-[78%] max-w-xs flex-col bg-navy-900 p-4 text-white">
-              <div className="mb-4 flex items-center justify-between">
-                <span className="font-display text-lg">เมนู</span>
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Seal className="h-10 w-10" />
+                  <span className="font-display text-sm font-semibold leading-tight">MUSC SportSpace</span>
+                </div>
                 <button aria-label="ปิด" onClick={() => setOpen(false)}><X /></button>
               </div>
               <div className="flex flex-col gap-1">{nav}</div>
@@ -138,6 +153,7 @@ export function Layout({ devMail }: { devMail: boolean }) {
         )}
 
         <main id="content" className="pb-nav px-4 py-5 sm:px-6 lg:px-8">
+          {user && <HoldBanner />}
           <Outlet />
         </main>
       </div>

@@ -84,7 +84,7 @@ export default function CalendarPage() {
         <div>
           <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500">
             <span className={cn('h-2 w-2 rounded-full', live ? 'live-dot bg-emerald-500' : 'bg-amber-400')} />
-            {live ? 'ตารางอัปเดตสด' : 'กำลังซิงก์'}
+            {live ? 'ข้อมูลอัปเดตทันที' : 'กำลังเชื่อมต่อ'}
           </p>
           <h1 className="font-display text-3xl font-semibold">ปฏิทินการใช้สนาม</h1>
         </div>
@@ -133,7 +133,7 @@ function DayList({ date, items }: { date: string; items: ScheduleItem[] }) {
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: sportOf(item.facilityType).from }} />
           <div className="min-w-0 flex-1">
             <p className="truncate font-medium">{item.facilityNameTh}</p>
-            <p className="text-xs text-slate-500">{item.isMine ? 'การจองของฉัน' : item.bookerName || 'จองแล้ว'} {item.activityName && `· ${item.activityName}`}</p>
+            <p className="text-xs text-slate-500">{item.isMine ? 'รายการของท่าน' : item.bookerName || 'มีการจองแล้ว'} {item.activityName && `· ${item.activityName}`}</p>
           </div>
           {item.lightsOn && <Lightbulb size={16} className="text-amber-500" aria-label="เปิดไฟ" />}
         </div>
@@ -167,7 +167,7 @@ function DayGrid({ date, items, facilities, closures }: { date: string; items: S
                   const open = start >= facility.openTime && start < facility.closeTime
                   if (!open) return <td key={facility.id} className="bg-slate-50 px-1 py-2 text-slate-300 dark:bg-white/5">—</td>
                   if (closed) return <td key={facility.id} className="px-1 py-2 text-slate-400">ปิด</td>
-                  if (hit) return <td key={facility.id} className="px-1 py-2"><span className="block rounded-lg px-1.5 py-1 text-white" style={{ background: sportOf(facility.type).from }}>{hit.isMine ? 'ของฉัน' : 'จองแล้ว'}</span></td>
+                  if (hit) return <td key={facility.id} className="px-1 py-2"><span className="block rounded-lg px-1.5 py-1 text-white" style={{ background: sportOf(facility.type).from }}>{hit.isMine ? 'ของท่าน' : 'จองแล้ว'}</span></td>
                   return <td key={facility.id} className="px-1 py-2"><Link to={`/book/${facility.slug}?date=${date}&start=${start}`} className="block rounded-lg bg-emerald-50 px-1.5 py-1 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">ว่าง</Link></td>
                 })}
               </tr>
@@ -193,7 +193,7 @@ function WeekView({ from, items, onPick }: { from: string; items: ScheduleItem[]
                 <p key={item.id} className="truncate rounded-lg px-2 py-1 text-[11px] text-white" style={{ background: sportOf(item.facilityType).from }}>{item.startTime} {sportOf(item.facilityType).th}</p>
               ))}
               {rows.length > 5 && <p className="text-xs text-slate-500">+{rows.length - 5}</p>}
-              {!rows.length && <p className="text-xs text-slate-400">ยังไม่มีการจอง</p>}
+              {!rows.length && <p className="text-xs text-slate-400">ไม่มีรายการจอง</p>}
             </div>
           </button>
         )
@@ -228,5 +228,5 @@ function MonthView({ anchor, items, onPick }: { anchor: string; items: ScheduleI
 }
 
 function Empty() {
-  return <div className="glass rounded-[28px] p-10 text-center text-slate-500">ยังไม่มีการจองในช่วงนี้</div>
+  return <div className="glass rounded-[28px] p-10 text-center text-slate-500">ไม่มีรายการจองในช่วงเวลาที่เลือก</div>
 }

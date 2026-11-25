@@ -1,11 +1,13 @@
 import { Download, Printer, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { OtpHoldPanel } from '../components/OtpHoldPanel'
 import { StatusPill, Skeleton } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { ApiError, api } from '../lib/api'
 import { addDays, formatThaiDate, todayIso } from '../lib/format'
+import { holdFromBooking } from '../lib/hold'
 import type { Booking } from '../lib/types'
 
 export default function HistoryPage() {
@@ -13,6 +15,7 @@ export default function HistoryPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const [rows, setRows] = useState<Booking[] | null>(null)
+  const [otpFor, setOtpFor] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [week, setWeek] = useState(true)
   const [from, setFrom] = useState(addDays(todayIso(), -7))
@@ -75,6 +78,25 @@ export default function HistoryPage() {
           </>
         )}
       </div>
+      <div className="no-print mb-4 grid gap-3">
+        {(rows || []).filter((row) => row.status === 'PENDING_OTP').map((row) => {
+          const pending = holdFromBooking(row)
+          if (!pending) return null
+          return (
+            <article key={row.id} className="glass rounded-[28px] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <StatusPill status={row.status} />
+                  <h2 className="mt-2 font-semibold">{row.facility.nameTh}</h2>
+                  <p className="text-sm text-slate-500">{formatThaiDate(row.date)} · {row.startTime}–{row.endTime}</p>
+                </div>
+                <button className="rounded-2xl bg-navy-900 px-4 py-2 text-sm font-semibold text-white" onClick={() => setOtpFor((current) => current === row.id ? null : row.id)}>กรอกรหัส OTP</button>
+              </div>
+              {otpFor === row.id && <div className="mt-4"><OtpHoldPanel hold={pending} onConfirmed={() => { setOtpFor(null); api<{ bookings: Booking[] }>('/api/bookings').then((data) => setRows(data.bookings)).catch(() => {}) }} onReleased={() => { setOtpFor(null); api<{ bookings: Booking[] }>('/api/bookings').then((data) => setRows(data.bookings)).catch(() => {}) }} /></div>}
+            </article>
+          )
+        })}
+      </div>
       <div className="print-area glass overflow-x-auto rounded-[28px]">
         <table className="w-full min-w-[680px] text-left text-sm">
           <thead className="bg-navy-900 text-white">
@@ -91,7 +113,7 @@ export default function HistoryPage() {
                 <td className="px-3 py-3"><StatusPill status={row.status} /></td>
               </tr>
             ))}
-            {!filtered.length && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-500">ไม่พบรายการ</td></tr>}
+            {!filtered.length && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-500">ไม่พบรายการจองตามเงื่อนไขที่เลือก</td></tr>}
           </tbody>
         </table>
       </div>

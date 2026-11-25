@@ -20,18 +20,18 @@ export default function WalletPage() {
     if (!user) return
     api<{ balance: number; transactions: Tx[] }>('/api/wallet')
       .then((data) => { setBalance(data.balance); setTransactions(data.transactions) })
-      .catch((error) => toast.push(error instanceof ApiError ? error.message : 'โหลดกระเป๋าไม่สำเร็จ', 'err'))
+      .catch((error) => toast.push(error instanceof ApiError ? error.message : 'โหลดข้อมูลเหรียญไม่สำเร็จ', 'err'))
   }, [user, loading])
 
   if (balance === null) return <Skeleton className="h-64" />
   return (
     <div className="mx-auto max-w-2xl">
       <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Wallet</p>
-      <h1 className="font-display text-3xl font-semibold">กระเป๋าเหรียญ</h1>
+      <h1 className="font-display text-3xl font-semibold">บัญชีเหรียญ</h1>
       <div className="mt-4 overflow-hidden rounded-[32px] bg-navy-900 p-6 text-white">
         <p className="flex items-center gap-2 text-sm text-gold-300"><Coins size={16} /> คงเหลือ</p>
         <p className="mt-2 font-display text-6xl font-semibold">{balance.toLocaleString('th-TH')}</p>
-        <p className="mt-3 max-w-md text-sm text-white/70">เหรียญใช้เมื่อเปิดไฟสนาม ระบบกันวงเงินตอนส่งคำขอ และคืนให้ถ้า OTP หมดอายุหรือยกเลิกก่อนเวลาเริ่มอย่างน้อย 2 ชั่วโมง</p>
+        <p className="mt-3 max-w-md text-sm text-white/70">เหรียญใช้สำหรับค่าเปิดไฟสนาม ระบบจะกันยอดเมื่อส่งคำขอ และคืนเหรียญหากรหัส OTP หมดอายุ หรือหากยกเลิกก่อนเวลาเริ่มอย่างน้อย 2 ชั่วโมง</p>
       </div>
       <ul className="mt-4 space-y-2">
         {transactions.map((tx) => (

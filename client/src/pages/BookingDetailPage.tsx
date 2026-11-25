@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { OtpHoldPanel } from '../components/OtpHoldPanel'
 import { StatusPill, Skeleton } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { ApiError, api } from '../lib/api'
 import { PURPOSE_LABEL, formatThaiDate } from '../lib/format'
+import { holdFromBooking } from '../lib/hold'
 import type { Booking } from '../lib/types'
 
 export default function BookingDetailPage() {
@@ -30,6 +32,11 @@ export default function BookingDetailPage() {
       <p className="text-slate-500">{formatThaiDate(booking.date)} · {booking.startTime}–{booking.endTime}</p>
       <p className="mt-1 text-sm">{PURPOSE_LABEL[booking.purpose]} {booking.activityName && `· ${booking.activityName}`}</p>
       <p className="text-sm">{booking.lightsOn ? `เปิดไฟ · ${booking.lightCost} เหรียญ` : 'ปิดไฟ'}</p>
+      {holdFromBooking(booking) && (
+        <div className="mt-5 text-left">
+          <OtpHoldPanel hold={holdFromBooking(booking)!} onConfirmed={(next) => setBooking(next)} onReleased={() => navigate('/bookings')} />
+        </div>
+      )}
       {booking.qrDataUrl ? (
         <>
           <img src={booking.qrDataUrl} alt={`QR รหัส ${booking.checkInCode}`} className="mx-auto mt-5 h-64 w-64 rounded-[28px] bg-white p-4 shadow-lift" />
@@ -37,7 +44,7 @@ export default function BookingDetailPage() {
           <p className="text-sm text-slate-500">ให้เจ้าหน้าที่สแกนหรือกรอกรหัสนี้</p>
         </>
       ) : (
-        <p className="mt-6 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">รายการนี้ยังไม่มี QR เพราะยังไม่ยืนยันหรือถูกยกเลิก</p>
+        <p className="mt-6 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">รายการนี้ยังไม่มีรหัส QR เนื่องจากยังไม่ได้ยืนยัน หรือได้ยกเลิกแล้ว</p>
       )}
       {!!booking.teammates.length && (
         <ul className="mt-5 space-y-2 text-left text-sm">

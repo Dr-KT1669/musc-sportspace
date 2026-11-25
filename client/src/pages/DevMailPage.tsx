@@ -15,7 +15,7 @@ export default function DevMailPage() {
         const data = await api<{ emails: Mail[] }>('/api/dev/mailbox')
         if (!stop) setEmails(data.emails)
       } catch {
-        if (!stop) setError('กล่องจดหมายทดลองไม่พร้อม ถ้าตั้ง SMTP ไว้ รหัสจะถูกส่งทางอีเมลจริง')
+        if (!stop) setError('กล่องจดหมายทดสอบไม่พร้อมใช้งาน หากตั้งค่า SMTP แล้ว รหัสจะถูกส่งทางอีเมลสถาบัน')
       }
     }
     load()
@@ -28,9 +28,9 @@ export default function DevMailPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <p className="text-xs uppercase tracking-[0.18em] text-amber-600">Development only</p>
-      <h1 className="font-display text-3xl font-semibold">กล่องจดหมายทดลอง</h1>
-      <p className="mb-4 text-sm text-slate-500">ไม่มี SMTP จึงแสดง OTP ที่นี่และในล็อกของเซิร์ฟเวอร์ ใช้ทดสอบการยืนยันการจองได้ครบ</p>
-      {!emails.length && <p className="glass rounded-[28px] p-6 text-slate-500">ยังไม่มีอีเมล ลองจองสนามแล้วกลับมาที่นี่</p>}
+      <h1 className="font-display text-3xl font-semibold">กล่องจดหมายทดสอบ</h1>
+      <p className="mb-4 text-sm text-slate-500">ขณะนี้ยังไม่ได้ตั้งค่า SMTP ระบบจึงแสดงรหัส OTP ในหน้านี้และในบันทึกของเซิร์ฟเวอร์ เพื่อใช้ยืนยันการจอง</p>
+      {!emails.length && <p className="glass rounded-[28px] p-6 text-slate-500">ยังไม่มีจดหมาย กรุณาทำรายการจองแล้วกลับมาที่หน้านี้</p>}
       <div className="space-y-3">
         {emails.map((mail) => (
           <article key={mail.id} className="glass rounded-[28px] p-4">

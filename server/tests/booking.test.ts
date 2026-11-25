@@ -118,6 +118,33 @@ describe('booking conflicts', () => {
 })
 
 describe('OTP flow', () => {
+  it('returns the active hold and releases it after the OTP expires', async () => {
+    const user = await registerStudent()
+    const created = await request(app).post('/api/bookings').set(auth(user.token)).send({
+      facilitySlug: 'tt-1',
+      date: futureDate(7),
+      startTime: '15:00',
+      endTime: '16:00',
+      purpose: 'PRACTICE',
+    })
+    expect(created.status).toBe(201)
+    const hold = await request(app).get('/api/bookings/hold').set(auth(user.token))
+    expect(hold.status).toBe(200)
+    expect(hold.body.hold.bookingId).toBe(created.body.booking.id)
+    expect(hold.body.hold.secondsLeft).toBeGreaterThan(0)
+    expect(hold.body.hold.facilitySlug).toBe('tt-1')
+
+    await getPrisma().otpCode.update({
+      where: { bookingId: created.body.booking.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    })
+    const gone = await request(app).get('/api/bookings/hold').set(auth(user.token))
+    expect(gone.status).toBe(200)
+    expect(gone.body.hold).toBeNull()
+    const stored = await getPrisma().booking.findUnique({ where: { id: created.body.booking.id } })
+    expect(stored?.status).toBe('EXPIRED')
+  })
+
   it('confirms a booking only with the emailed code', async () => {
     const user = await registerStudent()
     const created = await request(app).post('/api/bookings').set(auth(user.token)).send({

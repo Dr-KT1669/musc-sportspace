@@ -76,7 +76,7 @@ export default function LoginPage() {
       const body = mode === 'login' ? { studentId: form.studentId, password: form.password } : form
       const data = await api<{ user: User }>(path, { method: 'POST', body: JSON.stringify(body) })
       setUser(data.user)
-      toast.push(mode === 'login' ? `สวัสดี ${data.user.name}` : 'สมัครสมาชิกแล้ว เริ่มจองสนามได้เลย', 'ok')
+      toast.push(mode === 'login' ? `ยินดีต้อนรับ ${data.user.name}` : 'สมัครสมาชิกเรียบร้อยแล้ว ท่านสามารถดำเนินการจองสนามได้', 'ok')
       navigate('/calendar')
     } catch (error) {
       toast.push(error instanceof ApiError ? error.message : 'เข้าสู่ระบบไม่สำเร็จ', 'err')
@@ -125,11 +125,13 @@ export default function LoginPage() {
             </button>
           </div>
           <div className="max-w-xl py-8">
-            <p className="text-sm text-gold-300">ระบบจองสนามกีฬาและอุปกรณ์กีฬาออนไลน์</p>
-            <h1 className="mt-3 font-display text-4xl font-semibold leading-tight sm:text-6xl">จองคอร์ท ก่อนเพื่อนจะกดทัน</h1>
-            <p className="mt-4 max-w-md text-white/80">แบดมินตัน บาสเกตบอล วอลเลย์บอล ปิงปอง ฟิตเนส ฟุตบอล และสระว่ายน้ำ — ยืนยันด้วย OTP อีเมลสถาบัน แล้วพก QR ไปเช็คอินหน้าสนาม</p>
+            <p className="text-sm font-medium tracking-wide text-gold-300">Sports Facility Booking System</p>
+            <h1 className="mt-3 font-display text-3xl font-semibold leading-tight sm:text-5xl">ระบบจองสนามกีฬาและยืมอุปกรณ์กีฬา</h1>
+            <p className="mt-3 text-lg text-white">คณะวิทยาศาสตร์ มหาวิทยาลัยมหิดล</p>
+            <p className="mt-1 text-sm text-white/70">Faculty of Science, Mahidol University</p>
+            <p className="mt-4 max-w-xl text-white/80">บริการจองสนามแบดมินตัน บาสเกตบอล วอลเลย์บอล ปิงปอง ห้องออกกำลังกาย สนามฟุตบอล และสระว่ายน้ำ รวมถึงการยืมอุปกรณ์กีฬา โปรดยืนยันรายการด้วยรหัส OTP ที่ส่งไปยังอีเมลสถาบัน และใช้รหัส QR สำหรับเช็คอิน ณ สนาม</p>
             {free !== null && (
-              <p className="mt-6 inline-flex rounded-full bg-white/10 px-4 py-2 text-sm">วันนี้ยังว่าง <span className="mx-1 font-semibold text-court">{free}</span> ช่วงเวลา</p>
+              <p className="mt-6 inline-flex rounded-full bg-white/10 px-4 py-2 text-sm">วันนี้มีช่วงเวลาว่าง <span className="mx-1 font-semibold text-court">{free}</span> ช่วง</p>
             )}
             <ul className="mt-8 grid grid-cols-4 gap-2 sm:gap-3">
               {HERO_SPORTS.map((sport) => (
@@ -140,7 +142,7 @@ export default function LoginPage() {
               ))}
             </ul>
           </div>
-          <p className="text-xs text-white/60">คณะวิทยาศาสตร์ มหาวิทยาลัยมหิดล · Salaya</p>
+          <p className="text-xs text-white/60">คณะวิทยาศาสตร์ มหาวิทยาลัยมหิดล วิทยาเขตศาลายา</p>
         </div>
       </section>
 

@@ -80,7 +80,7 @@ export function StatusPill({ status }: { status: string }) {
   const label: Record<string, string> = {
     CONFIRMED: 'ยืนยันแล้ว',
     CHECKED_IN: 'เช็คอินแล้ว',
-    PENDING_OTP: 'รอ OTP',
+    PENDING_OTP: 'รอยืนยัน OTP',
     CANCELLED: 'ยกเลิก',
     COMPLETED: 'เสร็จสิ้น',
     EXPIRED: 'หมดอายุ',
